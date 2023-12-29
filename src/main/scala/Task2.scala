@@ -138,4 +138,59 @@ object Task2 {
       .reduce(_&&_)
   }
 
+  def GetBlockID(point: List[Double]) ={
+    val block_id = (point(1)/0.2)*5 + point(0)/0.2
+    block_id
+  }
+
+  def GetMinCount(point: List[Double], counts_per_block: List[Int]) ={
+    // Calculate the minimum dominance of a point that belongs to a specific block
+    // For example:
+    // If a point belongs to Block 12 then the minimum dominance, that this point will have
+    // equals to the number of points that belong to Blocks 18,19,23,24
+    //    20 21 22 | 23 24
+    //    15 16 17 | 18 19
+    //          V    ------
+    //    10 11 12 < 13 14
+    //    5  6  7    8  9
+    //    0  1  2    3  4
+
+    var sum = 0
+    val start_x = (point(0) / 0.2) + 1
+    val start_y = (point(1) / 0.2) + 1
+    for (x <- start_x.toInt to 5) {
+      for (y <- start_y.toInt to 5) {
+        val block_id = y*5 + x
+        sum = sum + counts_per_block(block_id)
+      }
+    }
+    sum
+  }
+
+  def GridDominance(data: RDD[List[Double]], top: Int): Unit = {
+
+    // Create a 5X5 Grid
+    //    20 21 22 23 24
+    //    15 16 17 18 19
+    //    10 11 12 13 14
+    //    5  6  7  8  9
+    //    0  1  2  3  4
+
+    // Count how many points belong to each block
+    val points_with_block = data.map(point => (point,GetBlockID(point)) )
+                .map( pair => (pair._2, pair._1) )
+                .groupByKey()
+                .map( pair => (pair._1, pair._2) )
+
+    val counts_per_block = data
+              .map(point => (GetBlockID(point), 1) )
+              .countByKey()
+
+    // Get Skyline points
+    val skylines = Task1.sfs(data) //find skyline points
+
+
+
+  }
+
 }

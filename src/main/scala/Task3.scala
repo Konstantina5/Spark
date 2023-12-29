@@ -4,6 +4,14 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 object Task3 {
+  def task3BruteForce(data: RDD[List[Double]], top: Int) = {
+    //TODO check if size < top
+    Task1.task1BruteForce(data)
+      .collect()
+      .map(point => Tuple2(point, Task2.countDominatedPoints2(point, data.collect())))
+      .sortBy(-_._2)
+      .take(top)
+  }
 
   def task3(data: RDD[List[Double]], top: Int) = {
     //TODO check if size < top
@@ -13,17 +21,7 @@ object Task3 {
       .take(top)
   }
 
-  def task33(data: RDD[List[Double]], top: Int, sc: SparkContext) : Array[(List[Double], Long)] = {
-    //TODO check if size < top
-    sc.parallelize(Task1.sfs(data)).cartesian(data)
-      .filter(pair => pair._1 != pair._2)
-      .map(points => Tuple2(points._1, if (Task1.dominates(points._1, points._2)) 1L else 0L))
-      .reduceByKey(_+_)
-      .sortBy(-_._2)
-      .take(top)
-  }
-
-  def task32(data: RDD[List[Double]], top: Int, sc: SparkContext) : Array[(List[Double], Long)] = {
+  def task32(data: RDD[List[Double]], top: Int, sc: SparkContext) = {
     //TODO check if size < top
     sc.parallelize(Task1.sfs(data)).cartesian(data)
       .filter(pair => pair._1 != pair._2)

@@ -31,14 +31,14 @@ object Spark {
 
     // ----------- Task 1 ----------
 
-//    runTask(() => Task1.task1BruteForce(parsedData), "Task 1")
-//    runTask(() => sc.parallelize(Task1.sfs(parsedData)), "Task 1")
+    runTask(() => Task1.task1BruteForce(parsedData), "Task 1")
+    runTask(() => sc.parallelize(Task1.sfs(parsedData)), "Task 1")
 
     runTask2(() => Task2.task2BruteForce(parsedData, 3), "Task 2")
     runTask2(() => Task2.STD(parsedData, 3, sc), "Task 2")
 
     runTask3(() => Task3.task3(parsedData, 3), "task 3")
-    runTask2(() => Task3.task33(parsedData, 3, sc), "task 3")
+//    runTask2(() => Task3.task33(parsedData, 3, sc), "task 3")
     runTask2(() => Task3.task32(parsedData, 3, sc), "task 3")
   }
 
