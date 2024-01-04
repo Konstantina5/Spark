@@ -138,28 +138,33 @@ object Task2 {
       .reduce(_&&_)
   }
 
+  // Given a point (x,y), return the BlockID(in a 5x5 grid) that it belongs
+  //    20 21 22 23 24
+  //    15 16 17 18 19
+  //    10 11 12 13 14
+  //    5  6  7  8  9
+  //    0  1  2  3  4
   def GetBlockID(point: List[Double]) ={
-    val block_id = (point(1)/0.2)*5 + point(0)/0.2
+    val block_id = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt * 5 + (BigDecimal(point(0)) / BigDecimal("0.2")).toInt
     block_id
   }
 
+  // Calculate the minimum dominance of a point that belongs to a specific block
+  // For example:
+  // If a point belongs to Block 12 then the minimum dominance, that this point will have
+  // equals to the number of points that belong to Blocks 18,19,23,24
+  //    20 21 22 | 23 24
+  //    15 16 17 | 18 19
+  //          V    ------
+  //    10 11 12 < 13 14
+  //    5  6  7    8  9
+  //    0  1  2    3  4
   def GetMinCount(point: List[Double], counts_per_block: List[Int]) ={
-    // Calculate the minimum dominance of a point that belongs to a specific block
-    // For example:
-    // If a point belongs to Block 12 then the minimum dominance, that this point will have
-    // equals to the number of points that belong to Blocks 18,19,23,24
-    //    20 21 22 | 23 24
-    //    15 16 17 | 18 19
-    //          V    ------
-    //    10 11 12 < 13 14
-    //    5  6  7    8  9
-    //    0  1  2    3  4
-
     var sum = 0
-    val start_x = (point(0) / 0.2) + 1
-    val start_y = (point(1) / 0.2) + 1
-    for (x <- start_x.toInt to 5) {
-      for (y <- start_y.toInt to 5) {
+    val start_x = (BigDecimal(point(0)) / BigDecimal("0.2")).toInt + 1
+    val start_y = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt + 1
+    for (x <- start_x to 4) {
+      for (y <- start_y to 4) {
         val block_id = y*5 + x
         sum = sum + counts_per_block(block_id)
       }
@@ -167,7 +172,51 @@ object Task2 {
     sum
   }
 
-  def GridDominance(data: RDD[List[Double]], top: Int): Unit = {
+  // Get RDD of points that are dominated by point
+  def IsDominatedByPoint(base_point: List[Double], target_point: List[Double]): Boolean = {
+    if ( (base_point(0) >=  target_point(0)) && (base_point(1) >=  target_point(1)) ) {
+      true
+    } else {
+      false
+    }
+  }
+
+  // Compare a given point with the points of the given block_id
+  def GetDominance_in_Block(point: List[Double], block_id: Int, points_with_block: RDD[(List[Double], Int)]) = {
+    val points_dominated =
+      points_with_block
+        //.filter(p=> GetBlockID(p) == block_id)
+        .filter(pair => pair._2 == block_id) // get all points that belong to block_id
+        .filter(p => !p._1.equals(point)) // exclude the point we are checking
+        .filter(p => IsDominatedByPoint(point, p._1))
+        .map(p => 1)
+        .reduce(_+_)
+
+    points_dominated
+  }
+
+  // Get the total dominance score of a given point
+  def GetTotalCount(point: List[Double], counts_per_block: List[Int], points_with_block: RDD[(List[Double], Int)] ) ={
+    var sum = GetMinCount(point, counts_per_block)
+    val start_x = (BigDecimal(point(0)) / BigDecimal("0.2")).toInt
+    val start_y = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt
+    // Get the Dominance score of the point within the block it belongs
+    var block_to_compare = start_y * 5 + start_x
+    sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
+    // Check all the blocks to the right
+    for (x <- (start_x + 1) to 4) {
+      block_to_compare = start_y * 5 + x
+      sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
+    }
+    // check all the blocks above
+    for (y <- (start_y + 1) to 4) {
+      block_to_compare =  y * 5 + start_x
+      sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
+    }
+    sum
+  }
+
+  def Top_k_GridDominance(data: RDD[List[Double]], top: Int, sc: SparkContext): Array[(List[Double], Int)] = {
 
     // Create a 5X5 Grid
     //    20 21 22 23 24
@@ -176,21 +225,58 @@ object Task2 {
     //    5  6  7  8  9
     //    0  1  2  3  4
 
-    // Count how many points belong to each block
-    val points_with_block = data.map(point => (point,GetBlockID(point)) )
-                .map( pair => (pair._2, pair._1) )
-                .groupByKey()
-                .map( pair => (pair._1, pair._2) )
+    // Create an RDD of the data points along with the BLock ID RDD: (point,BlockID)
+    val points_with_block =
+      data
+        .map(point => (point, GetBlockID(point)))
+    // .map( pair => (pair._2, pair._1) )
+    // .groupByKey()
+    // .map( pair => (pair._1, pair._2) )
 
-    val counts_per_block = data
-              .map(point => (GetBlockID(point), 1) )
-              .countByKey()
+    val block_counts: List[Int] = List.fill(25)(0)
+
+    // Count how many points belong to each block
+    val block_count = data
+      .map(point => (GetBlockID(point), 1))
+      .reduceByKey(_ + _)
+//      .map(pair => pair._2)
+      .collect()
+      .toList
+
+    val counts_per_block: List[Int] = block_count.foldLeft(block_counts) {
+      case (acc, (index, countToAdd)) =>
+        acc.updated(index, acc(index) + countToAdd)
+    }
 
     // Get Skyline points
-    val skylines = Task1.sfs(data) //find skyline points
+    // val skylines = Task1.sfs(data) //find skyline points    TODO: THIS IS NOT AN RDD
+    val skylines = Task1.task1BruteForce(data) //find skyline points
+
+    val skylines_with_block =
+      skylines
+        .map(point => (point, GetBlockID(point)))
+//        .map(pair => (pair._2, pair._1))
+//        // .groupByKey()
+//        .map(pair => (pair._1, pair._2))
 
 
+    // Calculate the actual dominance score for each of the skylines
+    // For example:
+    // If a point belongs to Block 12 then we know that it surely dominates all the points that belong to blocks 18,19,23,24
+    // and we have to CALCULATE which points it dominates(if any) from blocks 22,17,13,14
+    //    20 21 22 | 23 24
+    //    15 16 17 | 18 19
+    //          V    ------
+    //    10 11 12 < 13 14
+    //    5  6  7    8  9
+    //    0  1  2    3  4
+    val top_k =
+      skylines
+        .map(point => (point, GetTotalCount(point, counts_per_block, points_with_block)))
+        .sortBy(_._2)
+        .take(top)
 
+    top_k
   }
 
 }

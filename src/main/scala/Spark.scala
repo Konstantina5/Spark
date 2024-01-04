@@ -36,6 +36,7 @@ object Spark {
 
     runTask2(() => Task2.task2BruteForce(parsedData, 3), "Task 2")
     runTask2(() => Task2.STD(parsedData, 3, sc), "Task 2")
+    runTask2_grid(() => Task2.Top_k_GridDominance(parsedData, 3, sc), "Task 2-Grid")
 
     runTask3(() => Task3.task3(parsedData, 3), "task 3")
 //    runTask2(() => Task3.task33(parsedData, 3, sc), "task 3")
@@ -65,6 +66,19 @@ object Spark {
     println("-- " +  taskNumber + " --")
     println("Total time = " + (end - start) + "ms")
     println("Total skyline points = " + answer.length)
+    answer.foreach(arr => println(arr))
+  }
+
+  def runTask2_grid(function: () => Array[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
+    val start = System.currentTimeMillis()
+
+    val answer = function.apply()
+
+    val end = System.currentTimeMillis()
+
+    println("-- " +  taskNumber + " --")
+    println("Total time = " + (end - start) + "ms")
+//    println("Total skyline points = " + answer.length)
     answer.foreach(arr => println(arr))
   }
 
