@@ -183,16 +183,20 @@ object Task2 {
 
   // Compare a given point with the points of the given block_id
   def GetDominance_in_Block(point: List[Double], block_id: Int, points_with_block: RDD[(List[Double], Int)]) = {
+    var totalPoints = 0
     val points_dominated =
       points_with_block
         //.filter(p=> GetBlockID(p) == block_id)
         .filter(pair => pair._2 == block_id) // get all points that belong to block_id
         .filter(p => !p._1.equals(point)) // exclude the point we are checking
         .filter(p => IsDominatedByPoint(point, p._1))
+//        .foreach(nums => {
+//          totalPoints += 1
+//        })
         .map(p => 1)
         .reduce(_+_)
 
-    points_dominated
+    totalPoints
   }
 
   // Get the total dominance score of a given point
