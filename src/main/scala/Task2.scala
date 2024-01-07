@@ -174,7 +174,7 @@ object Task2 {
 
   // Get RDD of points that are dominated by point
   def IsDominatedByPoint(base_point: List[Double], target_point: List[Double]): Boolean = {
-    if ( (base_point(0) >=  target_point(0)) && (base_point(1) >=  target_point(1)) ) {
+    if ( (base_point(0) <=  target_point(0)) && (base_point(1) <=  target_point(1)) ) {
       true
     } else {
       false
@@ -182,45 +182,43 @@ object Task2 {
   }
 
   // Compare a given point with the points of the given block_id
-  def GetDominance_in_Block(point: List[Double], block_id: Int, points_with_block: RDD[(List[Double], Int)]) = {
-    var totalPoints = 0
+  def GetDominance_in_Block(point: List[Double], blocks_to_check: List[Int], points_with_block: RDD[(Int, Iterable[List[Double]])]) = {
     val points_dominated =
       points_with_block
-        //.filter(p=> GetBlockID(p) == block_id)
-        .filter(pair => pair._2 == block_id) // get all points that belong to block_id
-        .filter(p => !p._1.equals(point)) // exclude the point we are checking
-        .filter(p => IsDominatedByPoint(point, p._1))
-//        .foreach(nums => {
-//          totalPoints += 1
-//        })
-        .map(p => 1)
-        .reduce(_+_)
+        .filter(pair => blocks_to_check.contains(pair._1))
+        .flatMap(_._2)
+        .filter(p => !p.equals(point)) // exclude the point we are checking
+        .filter(p => IsDominatedByPoint(point, p))
+        .count()
 
-    totalPoints
+    points_dominated.toInt
   }
 
   // Get the total dominance score of a given point
-  def GetTotalCount(point: List[Double], counts_per_block: List[Int], points_with_block: RDD[(List[Double], Int)] ) ={
+  def GetTotalCount(point: List[Double], counts_per_block: List[Int], points_with_block: RDD[(Int, Iterable[List[Double]])]) ={
     var sum = GetMinCount(point, counts_per_block)
+
+    var blocks_to_check: List[Int] = List()
     val start_x = (BigDecimal(point(0)) / BigDecimal("0.2")).toInt
     val start_y = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt
     // Get the Dominance score of the point within the block it belongs
-    var block_to_compare = start_y * 5 + start_x
-    sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
+    blocks_to_check = blocks_to_check :+ start_y * 5 + start_x
+
     // Check all the blocks to the right
-    for (x <- (start_x + 1) to 4) {
-      block_to_compare = start_y * 5 + x
-      sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
-    }
-    // check all the blocks above
-    for (y <- (start_y + 1) to 4) {
-      block_to_compare =  y * 5 + start_x
-      sum = sum + GetDominance_in_Block(point, block_to_compare, points_with_block)
-    }
+    var range = (start_x + 1) to 4
+    var blocks_to_add = range.map(x => start_y * 5 + x).toList
+    blocks_to_check = blocks_to_check ++ blocks_to_add
+
+    // Check all the blocks above
+    range = (start_y + 1) to 4
+    blocks_to_add = range.map(y => (y * 5 + start_x)).toList
+    blocks_to_check = blocks_to_check ++ blocks_to_add
+
+    sum = sum + GetDominance_in_Block(point, blocks_to_check, points_with_block)
     sum
   }
 
-  def Top_k_GridDominance(data: RDD[List[Double]], top: Int, sc: SparkContext): Array[(List[Double], Int)] = {
+  def Top_k_GridDominance(data: RDD[List[Double]], top: Int, sc: SparkContext): List[(List[Double], Int)] = {
 
     // Create a 5X5 Grid
     //    20 21 22 23 24
@@ -233,9 +231,8 @@ object Task2 {
     val points_with_block =
       data
         .map(point => (point, GetBlockID(point)))
-    // .map( pair => (pair._2, pair._1) )
-    // .groupByKey()
-    // .map( pair => (pair._1, pair._2) )
+        .groupBy { case (_, blockID) => blockID }
+        .mapValues(iter => iter.map { case (point, _) => point })
 
     val block_counts: List[Int] = List.fill(25)(0)
 
@@ -253,16 +250,8 @@ object Task2 {
     }
 
     // Get Skyline points
-    // val skylines = Task1.sfs(data) //find skyline points    TODO: THIS IS NOT AN RDD
-    val skylines = Task1.task1BruteForce(data) //find skyline points
-
-    val skylines_with_block =
-      skylines
-        .map(point => (point, GetBlockID(point)))
-//        .map(pair => (pair._2, pair._1))
-//        // .groupByKey()
-//        .map(pair => (pair._1, pair._2))
-
+    val skylines = sc.parallelize(Task1.sfs(data)).collect().toList //find skyline points
+//    val skylines = Task1.task1BruteForce(data).collect().toList //find skyline points
 
     // Calculate the actual dominance score for each of the skylines
     // For example:
@@ -277,7 +266,7 @@ object Task2 {
     val top_k =
       skylines
         .map(point => (point, GetTotalCount(point, counts_per_block, points_with_block)))
-        .sortBy(_._2)
+        .sortBy(_._2)(Ordering[Int].reverse)
         .take(top)
 
     top_k

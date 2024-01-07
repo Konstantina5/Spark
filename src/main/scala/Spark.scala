@@ -69,7 +69,7 @@ object Spark {
     answer.foreach(arr => println(arr))
   }
 
-  def runTask2_grid(function: () => Array[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
+  def runTask2_grid(function: () => List[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
     val start = System.currentTimeMillis()
 
     val answer = function.apply()
