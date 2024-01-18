@@ -36,9 +36,10 @@ object Spark {
 
     runTask2(() => Task2.task2BruteForce(parsedData, 3), "Task 2")
     runTask2(() => Task2.STD(parsedData, 3, sc), "Task 2")
-    runTask2_grid(() => Task2.Top_k_GridDominance(parsedData, 3, sc), "Task 2-Grid")
+    runTask2_grid(() => Task2.Top_k_GridDominance(parsedData, 2, 3, sc), "Task 2 - Grid")
 
     runTask3(() => Task3.task3(parsedData, 3), "task 3")
+    runTask3_grid(() => Task3.Top_k_GridDominance(parsedData, 3, sc), "Task 3 - Grid")
 //    runTask2(() => Task3.task33(parsedData, 3, sc), "task 3")
     runTask2(() => Task3.task32(parsedData, 3, sc), "task 3")
   }
@@ -69,7 +70,7 @@ object Spark {
     answer.foreach(arr => println(arr))
   }
 
-  def runTask2_grid(function: () => List[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
+  def runTask2_grid(function: () => List[Tuple2[List[Double], Long]], taskNumber: String): Unit = {
     val start = System.currentTimeMillis()
 
     val answer = function.apply()
@@ -78,7 +79,20 @@ object Spark {
 
     println("-- " +  taskNumber + " --")
     println("Total time = " + (end - start) + "ms")
-//    println("Total skyline points = " + answer.length)
+    println("Total skyline points = " + answer.length)
+    answer.foreach(arr => println(arr))
+  }
+
+  def runTask3_grid(function: () => List[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
+    val start = System.currentTimeMillis()
+
+    val answer = function.apply()
+
+    val end = System.currentTimeMillis()
+
+    println("-- " +  taskNumber + " --")
+    println("Total time = " + (end - start) + "ms")
+    println("Total skyline points = " + answer.length)
     answer.foreach(arr => println(arr))
   }
 
