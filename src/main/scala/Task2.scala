@@ -147,14 +147,20 @@ object Task2 {
   }
 
   // Given a cell in a D-dimension Grid, find all the outward cell that are definitely dominated by it
-  def getOutwardCells(startingCell: List[Int], maxDimCell: List[Int]): List[List[Int]] = {
+  def getOutwardCells(startingCell: List[Int], maxDimCell: List[Int], dimensions: Int): List[List[Int]] = {
 
     var currentCoord = startingCell
     val outwardCoordinates = scala.collection.mutable.ListBuffer[List[Int]]()
 
-    while (currentCoord != maxDimCell) {
+    while (!currentCoord.exists(elem => elem > 4)) {
       outwardCoordinates += currentCoord
-      currentCoord = currentCoord.zip(maxDimCell).map { case (c, maxC) => if (c < maxC) c + 1 else c }
+      // Find the cells that are higher than the currentCoord in each dimension
+      for (d <- 0 until dimensions) {
+        for (i <- currentCoord(d) + 1 until 5) {
+          outwardCoordinates += currentCoord.updated(d, i)
+        }
+      }
+      currentCoord = currentCoord.map(elem => elem + 1)
     }
 
     outwardCoordinates.toList
@@ -168,8 +174,8 @@ object Task2 {
 
     val max_dim_cell: List[Int] = List.fill(dimensions)(4)
 
-    val outwardCoordinates_min = getOutwardCells(starting_cell_min, max_dim_cell)
-    val outwardCoordinates_max = getOutwardCells(starting_cell_max, max_dim_cell)
+    val outwardCoordinates_min = getOutwardCells(starting_cell_min, max_dim_cell, dimensions)
+    val outwardCoordinates_max = getOutwardCells(starting_cell_max, max_dim_cell, dimensions)
 
     // Extract counts for each list in outwardCoordinates
     val countsForCoordinates_min: List[Int] = outwardCoordinates_min.map { coordinates =>
@@ -242,6 +248,7 @@ object Task2 {
       .collect()
       .toMap
 
+
     val points_with_min_max =
       data
         .map { point =>
@@ -266,8 +273,6 @@ object Task2 {
         .map( triplet => (triplet, FindNeighbooringCells(triplet._1, dimensions))) // point, minCount, maxCount, Neighbouring Cells to check
         .map( triplet => (triplet._1, GetTotalCount(triplet._1._1, triplet._1._2, points_with_cellID.filter(pair => triplet._2.contains(pair._2) ))))
         .map( triplet => (triplet._1._1, triplet._2)) // Keep only point and score
-    println("UNSORTED")
-    println(top_k)
 
     top_k.sortBy(_._2)(Ordering[Long].reverse)
         .take(top)
