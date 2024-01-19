@@ -39,7 +39,7 @@ object Spark {
     runTask2_grid(() => Task2.Top_k_GridDominance(parsedData, 2, 3, sc), "Task 2 - Grid")
 
     runTask3(() => Task3.task3(parsedData, 3), "task 3")
-    runTask3_grid(() => Task3.Top_k_GridDominance(parsedData, 3, sc), "Task 3 - Grid")
+    runTask3_grid(() => Task3.Top_k_GridDominance(parsedData, 2, 3, sc), "Task 3 - Grid")
 //    runTask2(() => Task3.task33(parsedData, 3, sc), "task 3")
     runTask2(() => Task3.task32(parsedData, 3, sc), "task 3")
   }
@@ -83,7 +83,7 @@ object Spark {
     answer.foreach(arr => println(arr))
   }
 
-  def runTask3_grid(function: () => List[Tuple2[List[Double], Int]], taskNumber: String): Unit = {
+  def runTask3_grid(function: () => List[Tuple2[List[Double], Long]], taskNumber: String): Unit = {
     val start = System.currentTimeMillis()
 
     val answer = function.apply()

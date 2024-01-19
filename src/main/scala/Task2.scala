@@ -168,21 +168,24 @@ object Task2 {
 
   // Calculate the minimum and maximum dominance of a point that belongs to a specific cell
   def GetMinMaxCount(point: List[Double], CountsPerCell: Map[List[Int], Int], dimensions: Int): (Long, Long) ={
-    // Add 1 to all dims to take the cell that is definitely dominated by the point and then find all the cells outwards that
-    val starting_cell_min: List[Int] = point.map( elem => ((BigDecimal(elem) / BigDecimal("0.2")).toInt + 1).min(4) )
-    val starting_cell_max: List[Int] = point.map( elem => (BigDecimal(elem) / BigDecimal("0.2")).toInt )
 
     val max_dim_cell: List[Int] = List.fill(dimensions)(4)
 
-    val outwardCoordinates_min = getOutwardCells(starting_cell_min, max_dim_cell, dimensions)
+    // Add 1 to all dims to take the cell that is definitely dominated by the point and then find all the cells outwards that
+    val starting_cell_max: List[Int] = point.map( elem => (BigDecimal(elem) / BigDecimal("0.2")).toInt )
     val outwardCoordinates_max = getOutwardCells(starting_cell_max, max_dim_cell, dimensions)
-
-    // Extract counts for each list in outwardCoordinates
-    val countsForCoordinates_min: List[Int] = outwardCoordinates_min.map { coordinates =>
-      CountsPerCell.getOrElse(coordinates, 0)
-    }
     val countsForCoordinates_max: List[Int] = outwardCoordinates_max.map { coordinates =>
       CountsPerCell.getOrElse(coordinates, 0)
+    }
+
+    var countsForCoordinates_min: List[Int] = List(0)
+    val starting_cell_min: List[Int] = point.map(elem => ((BigDecimal(elem) / BigDecimal("0.2")).toInt + 1))
+    if (!starting_cell_min.exists(elem => elem > 4)) {
+      val outwardCoordinates_min = getOutwardCells(starting_cell_min, max_dim_cell, dimensions)
+      // Extract counts for each list in outwardCoordinates
+      countsForCoordinates_min = outwardCoordinates_min.map { coordinates =>
+        CountsPerCell.getOrElse(coordinates, 0)
+      }
     }
 
     (countsForCoordinates_min.sum.toLong, countsForCoordinates_max.sum.toLong)
@@ -247,7 +250,6 @@ object Task2 {
       .aggregateByKey(0)(_ + _, _ + _)
       .collect()
       .toMap
-
 
     val points_with_min_max =
       data

@@ -31,139 +31,147 @@ object Task3 {
       .take(top)
   }
 
-  // Given a point (x,y), return the BlockID(in a 5x5 grid) that it belongs
-  //    20 21 22 23 24
-  //    15 16 17 18 19
-  //    10 11 12 13 14
-  //    5  6  7  8  9
-  //    0  1  2  3  4
-  def GetBlockID(point: List[Double]) ={
-    val block_id = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt * 5 + (BigDecimal(point(0)) / BigDecimal("0.2")).toInt
-    block_id
+  //------------------------------------------------------------------------------------------------------------------
+
+  // Given a point, return the CellID( Coordinates of cell in D-dimension space) that it belongs assuming that max cell per dim are 5
+  def GetCellID(point: List[Double]) ={
+    val cell_id: List[Int] = point.map( elem => (BigDecimal(elem) / BigDecimal("0.2")).toInt )
+    cell_id
   }
 
-  // Calculate the minimum dominance of a point that belongs to a specific block
-  // For example:
-  // If a point belongs to Block 12 then the minimum dominance, that this point will have
-  // equals to the number of points that belong to Blocks 18,19,23,24
-  //    20 21 22 | 23 24
-  //    15 16 17 | 18 19
-  //          V    ------
-  //    10 11 12 < 13 14
-  //    5  6  7    8  9
-  //    0  1  2    3  4
-  def GetMinCount(point: List[Double], counts_per_block: List[Int]) ={
-    var sum = 0
-    val start_x = (BigDecimal(point(0)) / BigDecimal("0.2")).toInt + 1
-    val start_y = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt + 1
-//    for (x <- start_x to 4) {
-//      for (y <- start_y to 4) {
-//        val block_id = y*5 + x
-//        sum = sum + counts_per_block(block_id)
-//      }
-//    }
-    val indices = (start_x to 4).flatMap(x => (start_y to 4).map(y => y * 5 + x))
-    sum = sum + indices.map(counts_per_block).sum
+  // Given a cell in a D-dimension Grid, find all the outward cell that are definitely dominated by it
+  def getOutwardCells(startingCell: List[Int], maxDimCell: List[Int], dimensions: Int): List[List[Int]] = {
 
-    sum
-  }
+    var currentCoord = startingCell
+    val outwardCoordinates = scala.collection.mutable.ListBuffer[List[Int]]()
 
-  // Get RDD of points that are dominated by point
-  def IsDominatedByPoint(base_point: List[Double], target_point: List[Double]): Boolean = {
-    if ( (base_point(0) <=  target_point(0)) && (base_point(1) <=  target_point(1)) ) {
-      true
-    } else {
-      false
+    while (!currentCoord.exists(elem => elem > 4)) {
+      outwardCoordinates += currentCoord
+      // Find the cells that are higher than the currentCoord in each dimension
+      for (d <- 0 until dimensions) {
+        for (i <- currentCoord(d) + 1 until 5) {
+          outwardCoordinates += currentCoord.updated(d, i)
+        }
+      }
+      currentCoord = currentCoord.map(elem => elem + 1)
     }
+
+    outwardCoordinates.toList
+  }
+
+  // Calculate the minimum and maximum dominance of a point that belongs to a specific cell
+  def GetMinMaxCount(point: List[Double], CountsPerCell: Map[List[Int], Int], dimensions: Int): (Long, Long) ={
+
+    val max_dim_cell: List[Int] = List.fill(dimensions)(4)
+
+    // Add 1 to all dims to take the cell that is definitely dominated by the point and then find all the cells outwards that
+    val starting_cell_max: List[Int] = point.map( elem => (BigDecimal(elem) / BigDecimal("0.2")).toInt )
+    val outwardCoordinates_max = getOutwardCells(starting_cell_max, max_dim_cell, dimensions)
+    val countsForCoordinates_max: List[Int] = outwardCoordinates_max.map { coordinates =>
+      CountsPerCell.getOrElse(coordinates, 0)
+    }
+
+    var countsForCoordinates_min: List[Int] = List(0)
+    val starting_cell_min: List[Int] = point.map(elem => ((BigDecimal(elem) / BigDecimal("0.2")).toInt + 1))
+    if (!starting_cell_min.exists(elem => elem > 4)) {
+      val outwardCoordinates_min = getOutwardCells(starting_cell_min, max_dim_cell, dimensions)
+      // Extract counts for each list in outwardCoordinates
+      countsForCoordinates_min = outwardCoordinates_min.map { coordinates =>
+        CountsPerCell.getOrElse(coordinates, 0)
+      }
+    }
+
+    (countsForCoordinates_min.sum.toLong, countsForCoordinates_max.sum.toLong)
+  }
+
+
+  // Return true if base_point is dominated by target_point
+  def IsDominatedByPoint(base_point: List[Double], target_point: List[Double]): Boolean = {
+    base_point.zip(target_point).forall(pair => pair._1 <= pair._2)
   }
 
   // Compare a given point with the points of the given block_id
-  def GetDominance_in_Block(point: List[Double], blocks_to_check: List[Int], points_with_block: RDD[(Int, Iterable[List[Double]])]) = {
+  def Count_Dominance_in_Cells(point: List[Double], points_to_check: RDD[(List[Double], List[Int])]): Long = {
     val points_dominated =
-      points_with_block
-        .filter(pair => blocks_to_check.contains(pair._1))
-        .flatMap(_._2)
-        .filter(p => !p.equals(point)) // exclude the point we are checking
-        .filter(p => IsDominatedByPoint(point, p))
+      points_to_check
+        //        .flatMap(_._2)
+        .filter(pair => !pair._1.equals(point)) // exclude the point we are checking
+        .filter(pair => IsDominatedByPoint(point, pair._1))
         .count()
+        .toLong
 
-    points_dominated.toInt
+    points_dominated
   }
 
   // Get the total dominance score of a given point
-  def GetTotalCount(point: List[Double], counts_per_block: List[Int], points_with_block: RDD[(Int, Iterable[List[Double]])]) ={
-    var sum = GetMinCount(point, counts_per_block)
-
-    var blocks_to_check: List[Int] = List()
-    val start_x = (BigDecimal(point(0)) / BigDecimal("0.2")).toInt
-    val start_y = (BigDecimal(point(1)) / BigDecimal("0.2")).toInt
-    // Get the Dominance score of the point within the block it belongs
-    blocks_to_check = blocks_to_check :+ start_y * 5 + start_x
-
-    // Check all the blocks to the right
-    var range = (start_x + 1) to 4
-    var blocks_to_add = range.map(x => start_y * 5 + x).toList
-    blocks_to_check = blocks_to_check ++ blocks_to_add
-
-    // Check all the blocks above
-    range = (start_y + 1) to 4
-    blocks_to_add = range.map(y => (y * 5 + start_x)).toList
-    blocks_to_check = blocks_to_check ++ blocks_to_add
-
-    sum = sum + GetDominance_in_Block(point, blocks_to_check, points_with_block)
+  def GetTotalCount(point: List[Double], minCount: Long , points_with_cells: RDD[(List[Double], List[Int])]): Long ={
+    var sum = minCount
+    sum = sum + Count_Dominance_in_Cells(point, points_with_cells)
     sum
   }
 
-  def Top_k_GridDominance(data: RDD[List[Double]], top: Int, sc: SparkContext): List[(List[Double], Int)] = {
+  // Get the total dominance score of a given point
+  def FindNeighbooringCells(point: List[Double], dimensions: Int): List[List[Int]] ={
 
-    // Create a 5X5 Grid
-    //    20 21 22 23 24
-    //    15 16 17 18 19
-    //    10 11 12 13 14
-    //    5  6  7  8  9
-    //    0  1  2  3  4
+    var cells_to_check: List[List[Int]] = List()
+    val CellID = GetCellID(point)
+    // Add the cell that the point belongs to
+    cells_to_check = cells_to_check :+ CellID
 
-    // Create an RDD of the data points along with the BLock ID RDD: (point,BlockID)
-    val points_with_block =
-      data
-        .map(point => (point, GetBlockID(point)))
-        .groupBy { case (_, blockID) => blockID }
-        .mapValues(iter => iter.map { case (point, _) => point })
-
-    // Count how many points belong to each block
-    val block_count = data
-      .map(point => (GetBlockID(point), 1))
-      .reduceByKey(_ + _)
-      .collect()
-      .toList
-
-    // Create a list holding the count of each block
-    val block_counts: List[Int] = List.fill(25)(0)
-    val counts_per_block: List[Int] = block_count.foldLeft(block_counts) {
-      case (acc, (index, countToAdd)) =>
-        acc.updated(index, acc(index) + countToAdd)
+    // Add the rest of the cells to the list
+    for(d <- 0 until dimensions) {
+      for (i <- CellID(d)+1 until 5) {
+        val add_cell: List[Int] = CellID.updated(d, i)
+        cells_to_check = cells_to_check :+ add_cell
+      }
     }
 
-    // Get Skyline points
-    val skylines = sc.parallelize(Task1.sfs(data)).collect().toList //find skyline points
-    // val skylines = Task1.task1BruteForce(data).collect().toList //find skyline points
+    cells_to_check
+  }
 
-    // Calculate the actual dominance score for each of the skylines
-    // For example:
-    // If a point belongs to Block 12 then we know that it surely dominates all the points that belong to blocks 18,19,23,24
-    // and we have to CALCULATE which points it dominates(if any) from blocks 22,17,13,14
-    //    20 21 22 | 23 24
-    //    15 16 17 | 18 19
-    //          V    ------
-    //    10 11 12 < 13 14
-    //    5  6  7    8  9
-    //    0  1  2    3  4
-    val top_k =
+  def Top_k_GridDominance(data: RDD[List[Double]],dimensions: Int ,top: Int, sc: SparkContext): List[(List[Double], Long)] = {
+
+    // Create an RDD of the data points along with the BLock ID RDD: (point,BlockID)
+    val points_with_cellID =
+      data
+        .map(point => (point, GetCellID(point)))
+    //        .groupBy { case (_, cellID) => cellID }
+    //        .mapValues(iter => iter.map { case (point, _) => point })
+
+    val CountsPerCell = data
+      .map(point => (GetCellID(point), 1))
+      .aggregateByKey(0)(_ + _, _ + _)
+      .collect()
+      .toMap
+
+    val skylines = sc.parallelize(Task1.sfs(data))//.collect().toList //find skyline points
+
+    val points_with_min_max =
       skylines
-        .map(point => (point, GetTotalCount(point, counts_per_block, points_with_block)))
-        .sortBy(_._2)(Ordering[Int].reverse)
-        .take(top)
+        .map { point =>
+          val (minCount, maxCount) = GetMinMaxCount(point, CountsPerCell, dimensions)
+          (point, minCount, maxCount)
+        }
+        .sortBy(_._3, ascending= false)
 
-    top_k
+    //    val maxCountOfFirstElement: Long = points_with_min_max.first._3
+    val minCountOfFirstElement: Long = points_with_min_max.first._2
+
+    val candidate_points =
+      points_with_min_max
+//        .filter(  _._3 >=  minCountOfFirstElement)    // I assume that Always gives an RDD greater or equal than k and that it fits to the memory
+        .collect()
+        .toList
+
+    val top_k =
+      candidate_points
+        //        .collect()
+        //        .toList
+        .map( triplet => (triplet, FindNeighbooringCells(triplet._1, dimensions))) // point, minCount, maxCount, Neighbouring Cells to check
+        .map( triplet => (triplet._1, GetTotalCount(triplet._1._1, triplet._1._2, points_with_cellID.filter(pair => triplet._2.contains(pair._2) ))))
+        .map( triplet => (triplet._1._1, triplet._2)) // Keep only point and score
+
+    top_k.sortBy(_._2)(Ordering[Long].reverse)
+      .take(top)
   }
 }
