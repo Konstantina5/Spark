@@ -87,12 +87,12 @@ object Task2 {
 
     val skylines = Task1.ALS(data).toList //find skyline points
 
-    val points = data.collect().toList
-
-    var skylinePoints = skylines
-      .map(point => Tuple2(point, countDominatedPoints(point, points))) //for every skyline point calculate its dominance score
+    var skylinePoints = data
+      .mapPartitions(par =>  calculateDominanceScore(par, skylines)) //finds dominance scores of the skyline points in each partition
+      .reduceByKey(_ + _) //adds all the scores for each skyline point
+      .collect()
       .to[ArrayBuffer]
-      .sortBy(-_._2) //sort them based on their dominance score
+      .sortBy(-_._2) //sorts in descending order
 
     var result = ArrayBuffer[(List[Double], Long)]() //add the point with the max dominance score to the result array
     var topK = top
@@ -108,15 +108,18 @@ object Task2 {
         if(topK == 0) break()
         val currPoint = pointToAdd._1
 
-        val regionPoints = points
+        val regionPoints = data
           .filter(p => !p.equals(currPoint)) //filter the current point
           .filter(p => !skylinePoints.map(_._1).contains(p)) //filter the point if it's already in toCalculatePoints array
           .filter(p => Task1.dominates(currPoint, p)) //get only the points that are dominated by 'point'
           .filter(p => isInRegion(currPoint, p, skylinePoints)) //get only the points belonging to region of current point
 
-        Task1.salsaForALS(regionPoints.toIterator) //find the skyline points between the region points
-          .map(p => (p, countDominatedPoints(p, points))) //count the dominated points for each
-          .foreach(p => skylinePoints.append(p)) //add every point toCalculatePoints array
+        val regionSkylinePoints = Task1.salsaForALS(regionPoints.collect().toIterator).toList //find the skyline points between the region points
+
+        data
+          .mapPartitions(par =>  calculateDominanceScore(par, regionSkylinePoints)) //count the dominated points for each region skyline point
+          .reduceByKey(_ + _) //adds all the scores for each skyline point
+          .foreach(p => skylinePoints.append(p)) //add every point to 'skylinePoints' array
 
         //Add points belonging only to region of point to the toCalculatePoints RDD
         skylinePoints = skylinePoints
@@ -141,7 +144,7 @@ object Task2 {
 
     val skylinePoints = data
       .mapPartitions(par =>  calculateDominanceScore(par, broadcastSkylines.value)) //finds dominance scores of the skyline points in each partition
-      .reduceByKey(_ + _) //adds all the scores for each points
+      .reduceByKey(_ + _) //adds all the scores for each skyline point
       .collect()
       .to[ArrayBuffer]
       .sortBy(-_._2) //sorts in descending order
@@ -233,9 +236,9 @@ object Task2 {
    */
   def calculateDominanceScore(pointsInPartition: Iterator[List[Double]], skylinePoints: List[List[Double]]): Iterator[(List[Double], Long)] = {
     var result: Map[List[Double], Long] = Map()
-    val x1 = pointsInPartition.toList
+    val pointsInPartitionList = pointsInPartition.toList
     skylinePoints
-      .map(point => (point, x1.count(p => Task1.dominates(point, p)).toLong))
+      .map(point => (point, pointsInPartitionList.count(p => Task1.dominates(point, p)).toLong))
       .foreach(point => {
         result += point._1 -> (result.getOrElse(point._1, 0L) + point._2)
       })

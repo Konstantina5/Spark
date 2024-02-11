@@ -10,13 +10,8 @@ object RunHelper {
     val answer = function()
     val end = System.currentTimeMillis()
 
-//    println("-- " + taskNumber + " " + algorithm + " --")
-//    println("Total time = " + (end - start) + "ms")
-//    println("Total skyline points = " + answer.length)
-
     FileHelper.writeToFile(text, taskNumber, end - start, answer, "task" + taskNumber + algorithm + "Results.txt")
 
-//    answer.foreach(arr => println(arr))
     FileHelper.writeToPerformanceFile(taskNum, algorithm, end - start, distribution)
     answer
   }
@@ -26,12 +21,8 @@ object RunHelper {
     val answer = function()
     val end = System.currentTimeMillis()
 
-//    println("-- " + taskNumber + " " + algorithm + " --")
-//    println("Total time = " + (end - start) + "ms")
-//    println("Total skyline points = " + answer.count())
-
     FileHelper.writeToFile(text, taskNumber, end - start, answer.collect().toList, "task" + taskNumber + algorithm + "Results.txt")
-//    answer.foreach(arr => println(arr))
+
     FileHelper.writeToPerformanceFile(taskNum, algorithm, end - start, distribution)
     answer
   }
@@ -43,12 +34,8 @@ object RunHelper {
 
     val answer = calculate.toList
 
-//    println("-- " + taskNumber + " " + algorithm + " --")
-//    println("Total time = " + (end - start) + "ms")
-//    println("Total skyline points = " + answer.length)
-
     FileHelper.writeToFile(text, taskNumber, end - start, answer, "task" + taskNumber + algorithm + "Results.txt")
-//    answer.foreach(arr => println(arr))
+
     FileHelper.writeToPerformanceFile(taskNum, algorithm, end - start, distribution)
     answer
   }
@@ -58,12 +45,8 @@ object RunHelper {
     val answer = function()
     val end = System.currentTimeMillis()
 
-//    println("-- " + taskNumber + " " + algorithm + " --")
-//    println("Total time = " + (end - start) + "ms")
-//    println("Total skyline points = " + answer.length)
-
     FileHelper.writeToFile(text, taskNumber, end - start, answer.toList, "task" + taskNumber + algorithm + "Results.txt")
-//    answer.foreach(arr => println(arr))
+
     FileHelper.writeToPerformanceFile(taskNum, algorithm, end - start, distribution)
     answer
   }
